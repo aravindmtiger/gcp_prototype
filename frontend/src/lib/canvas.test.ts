@@ -22,6 +22,8 @@ describe('parseDrop', () => {
   it('reads a palette entry and rejects junk', () => {
     expect(parseDrop('{"tool":"web_search","label":"Web","config":{}}')?.tool).toBe('web_search');
     expect(parseDrop('not json')).toBeNull();
+    expect(parseDrop('{"marker":"start","label":"Start","config":{}}')).toBeNull();
+    expect(parseDrop('{"tool":"not_a_tool","label":"Unknown","config":{}}')).toBeNull();
   });
 });
 
@@ -45,5 +47,35 @@ describe('canvasProblems', () => {
 
   it('is empty when the canvas is ready', () => {
     expect(canvasProblems('policy_agent', 'Answers', [node('web_search_1', 'web_search')])).toEqual([]);
+  });
+
+  it('requires provider-specific configuration before saving', () => {
+    const problems = canvasProblems('policy_agent', 'Answers', [
+      node('db_1', 'nosql_executor'),
+      node('mail_1', 'email_sender'),
+      node('file_1', 'file_reader'),
+      node('if_1', 'if_else'),
+    ]);
+    expect(problems).toEqual([
+      'db_1: choose a firestore collection',
+      'mail_1: choose a sender email',
+      'file_1: choose a gcs bucket',
+      'if_1: choose a condition',
+      "if_1: label its two outgoing paths 'true' and 'false'",
+    ]);
+  });
+
+  it('requires route labels and valid control-node paths', () => {
+    const route = node('route_1', 'router');
+    expect(canvasProblems('policy_agent', 'Answers', [route], [
+      { source: 'route_1', target: 'a', label: 'lookup' },
+      { source: 'route_1', target: 'b' },
+    ])).toContain('route_1: label every outgoing path');
+    expect(canvasProblems('policy_agent', 'Answers', [
+      node('if_1', 'if_else', { condition: 'Should continue?' }),
+    ], [
+      { source: 'if_1', target: 'a', label: 'true' },
+      { source: 'if_1', target: 'b', label: 'false' },
+    ])).toEqual([]);
   });
 });

@@ -44,7 +44,7 @@ export function ToolNode({ id, data, selected }: NodeProps<FlowNode>) {
   return (
     <div
       className={`${styles.card} ${selected ? styles.cardSelected : ''} ${data.needsSetup ? styles.cardWarn : ''}`}
-      style={{ width: 260 }}
+      style={{ width: 180 }}
     >
       <Handle type="target" position={Position.Left} id="in" className={styles.port} style={{ top: 40 }} />
       <div className={styles.head} style={{ background: style.head }}>
@@ -87,30 +87,27 @@ export function ToolNode({ id, data, selected }: NodeProps<FlowNode>) {
 }
 
 /** Start and Stop markers. They mark where the flow begins and ends; they are not agents. */
-export function MarkerNode({ id, data, selected }: NodeProps<FlowNode>) {
-  const { deleteElements } = useReactFlow();
+export function MarkerNode({ data, selected }: NodeProps<FlowNode>) {
   const isStart = data.kind === 'start';
   return (
     <div
       className={`${styles.marker} ${isStart ? styles.markerStart : styles.markerEnd} ${selected ? styles.markerSelected : ''}`}
+      role="img"
+      aria-label={isStart ? 'Start' : 'Stop'}
     >
-      <span aria-hidden="true">{isStart ? '▶' : '■'}</span>
-      <span>{isStart ? 'START' : 'STOP'}</span>
-      {data.editable && (
-        <button
-          type="button"
-          className={styles.markerRemove}
-          aria-label={`Remove ${isStart ? 'Start' : 'Stop'}`}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={() => void deleteElements({ nodes: [{ id }] })}
-        >
-          <CloseIcon />
-        </button>
+      {isStart ? (
+        <svg className={styles.markerIcon} viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 5.5v13L19 12 8 5.5Z" />
+        </svg>
+      ) : (
+        <svg className={styles.markerIcon} viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="7" y="7" width="10" height="10" rx="1" />
+        </svg>
       )}
       {isStart ? (
-        <Handle type="source" position={Position.Right} id="out" className={styles.port} />
+        <Handle type="source" position={Position.Right} id="out" className={`${styles.port} ${styles.markerPort}`} />
       ) : (
-        <Handle type="target" position={Position.Left} id="in" className={styles.port} />
+        <Handle type="target" position={Position.Left} id="in" className={`${styles.port} ${styles.markerPort}`} />
       )}
     </div>
   );

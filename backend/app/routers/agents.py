@@ -13,6 +13,9 @@ from app.schemas import (
     AgentUpdate,
     AgentWorkflow,
     ApprovalOut,
+    ArchitectureEdge,
+    ArchitectureNode,
+    ArchitecturePosition,
 )
 from app.services.adk_draft import identifier, render_adk_agent
 from app.services.adk_graph import (
@@ -44,8 +47,8 @@ TOOL_CATALOG = [
     {
         "id": "nosql_executor",
         "label": "NoSQL executor",
-        "description": "Runs document-store or collection-style queries against a NoSQL backend.",
-        "config": ["knowledge_source_id"],
+        "description": "Queries a Firestore collection using the deployed service identity.",
+        "config": ["firestore_collection"],
     },
     {
         "id": "web_search",
@@ -56,14 +59,14 @@ TOOL_CATALOG = [
     {
         "id": "email_sender",
         "label": "Email sender",
-        "description": "Sends email notifications or outbound messages from the workflow.",
-        "config": [],
+        "description": "Sends email through Gmail using delegated runtime credentials.",
+        "config": ["sender_email"],
     },
     {
         "id": "file_reader",
         "label": "File reader",
-        "description": "Reads files and extracts structured or unstructured content.",
-        "config": [],
+        "description": "Reads UTF-8 text files from a configured Cloud Storage bucket.",
+        "config": ["gcs_bucket"],
     },
     {
         "id": "code_executor",
@@ -99,7 +102,7 @@ TOOL_CATALOG = [
         "id": "if_else",
         "label": "If Else",
         "description": "Evaluates a branch condition and chooses the next path.",
-        "config": [],
+        "config": ["condition"],
     },
     {
         "id": "hitl",
@@ -117,9 +120,14 @@ async def list_tools() -> list[dict]:
     return TOOL_CATALOG
 
 
-async def _check_references(session: DbSession, user: User, workflow: AgentWorkflow) -> None:
-    """Every tool must point at a resource the user owns, of the right kind."""
-    for node in workflow.nodes:
+async def _check_references(
+    session: DbSession, user: User, architecture: AgentArchitecture
+) -> dict[str, dict]:
+    """Validate owned resources and resolve non-secret config needed by generated agents."""
+    source_configs: dict[str, dict] = {}
+    for node in architecture.nodes:
+        if node.kind != "tool":
+            continue
         if node.tool == "knowledge_retriever":
             source = await get_owned(
                 session,
@@ -132,7 +140,8 @@ async def _check_references(session: DbSession, user: User, workflow: AgentWorkf
                 raise AppError(
                     422, f"'{node.id}': knowledge retriever needs an unstructured source"
                 )
-        elif node.tool in {"sql_executor", "nosql_executor", "no_sql_executor"}:
+            source_configs[node.id] = dict(source.config)
+        elif node.tool == "sql_executor":
             source = await get_owned(
                 session,
                 KnowledgeSource,
@@ -141,9 +150,11 @@ async def _check_references(session: DbSession, user: User, workflow: AgentWorkf
                 "Knowledge source",
             )
             if source.kind != "structured":
-                raise AppError(422, f"'{node.id}': data executor needs a structured source")
+                raise AppError(422, f"'{node.id}': SQL executor needs a structured source")
+            source_configs[node.id] = dict(source.config)
         elif node.tool == "mcp_server":
             await get_owned(session, McpServer, user, node.config["mcp_server_id"], "MCP server")
+    return source_configs
 
 
 async def _ensure_unique_name(session: DbSession, name: str, agent_id: str | None = None) -> None:
@@ -170,7 +181,12 @@ async def list_agents(session: DbSession, user: User) -> list[AgentDraft]:
     return list((await session.execute(statement)).scalars().all())
 
 
-def _compile(name: str, description: str, architecture: AgentArchitecture) -> dict:
+def _compile(
+    name: str,
+    description: str,
+    architecture: AgentArchitecture,
+    source_configs: dict[str, dict] | None = None,
+) -> dict:
     """Compiles the canvas into an ADK graph and renders the source. Invalid graphs are a 422."""
     try:
         compiled = compile_architecture(architecture, identifier(name))
@@ -178,7 +194,7 @@ def _compile(name: str, description: str, architecture: AgentArchitecture) -> di
         raise AppError(422, " ".join(exc.messages)) from exc
     return {
         "adk_graph": compiled.as_dict(),
-        "adk_source": render_adk_agent(name, description, compiled.as_dict()),
+        "adk_source": render_adk_agent(name, description, compiled.as_dict(), source_configs),
         "workflow": _workflow_in_order(architecture, compiled.order),
     }
 
@@ -199,16 +215,78 @@ def _workflow_in_order(architecture: AgentArchitecture, order: list[str]) -> dic
 
 
 def _architecture_for(payload_architecture, payload_workflow) -> AgentArchitecture:
-    if payload_architecture is not None:
-        return payload_architecture
-    return architecture_from_workflow(payload_workflow)
+    architecture = (
+        payload_architecture
+        if payload_architecture is not None
+        else architecture_from_workflow(payload_workflow)
+    )
+    nodes = list(architecture.nodes)
+    edges = list(architecture.edges)
+    known_ids = {node.id for node in nodes}
+
+    def marker_id(base: str) -> str:
+        candidate = base
+        suffix = 1
+        while candidate in known_ids:
+            candidate = f"{base}_{suffix}"
+            suffix += 1
+        known_ids.add(candidate)
+        return candidate
+
+    start = next((node for node in nodes if node.kind == "start"), None)
+    if start is None:
+        start = ArchitectureNode(
+            id=marker_id("start"),
+            kind="start",
+            position=ArchitecturePosition(x=90, y=240),
+        )
+        nodes.append(start)
+
+    end = next((node for node in nodes if node.kind == "end"), None)
+    if end is None:
+        end = ArchitectureNode(
+            id=marker_id("end"),
+            kind="end",
+            position=ArchitecturePosition(x=690, y=240),
+        )
+        nodes.append(end)
+
+    tools = [node for node in nodes if node.kind == "tool"]
+    tool_ids = {node.id for node in tools}
+    incoming = {
+        edge.target for edge in edges if edge.source in tool_ids and edge.target in tool_ids
+    }
+    outgoing = {
+        edge.source for edge in edges if edge.source in tool_ids and edge.target in tool_ids
+    }
+    start_targets = {edge.target for edge in edges if edge.source == start.id}
+    end_sources = {edge.source for edge in edges if edge.target == end.id}
+    edge_ids = {edge.id for edge in edges}
+
+    def add_edge(source: str, target: str) -> None:
+        base_id = f"auto_{source}_{target}"
+        edge_id = base_id
+        suffix = 1
+        while edge_id in edge_ids:
+            edge_id = f"{base_id}_{suffix}"
+            suffix += 1
+        edge_ids.add(edge_id)
+        edges.append(ArchitectureEdge(id=edge_id, source=source, target=target))
+
+    for node in tools:
+        if node.id not in incoming and node.id not in start_targets:
+            add_edge(start.id, node.id)
+        if node.id not in outgoing and node.id not in end_sources:
+            add_edge(node.id, end.id)
+
+    return AgentArchitecture(nodes=nodes, edges=edges)
 
 
 @router.post("/agents", response_model=AgentOut, status_code=status.HTTP_201_CREATED)
 async def create_agent(payload: AgentCreate, session: DbSession, user: Builder) -> AgentDraft:
     architecture = _architecture_for(payload.architecture, payload.workflow)
-    compiled = _compile(payload.name, payload.description, architecture)
-    await _check_references(session, user, AgentWorkflow.model_validate(compiled["workflow"]))
+    source_configs = await _check_references(session, user, architecture)
+    compiled = _compile(payload.name, payload.description, architecture, source_configs)
     if payload.guardrail_template_id:
         await get_visible_guardrail(session, user, payload.guardrail_template_id)
     await _ensure_unique_name(session, payload.name)
@@ -249,10 +327,15 @@ async def update_agent(
         )
         architecture = AgentArchitecture.model_validate(architecture)
     else:
-        architecture = _architecture_for(payload.architecture, payload.workflow)
+        architecture = (
+            payload.architecture
+            if payload.architecture is not None
+            else architecture_from_workflow(payload.workflow)
+        )
+    architecture = _architecture_for(architecture, None)
     description = payload.description if payload.description is not None else agent.description
-    compiled = _compile(agent.name, description, architecture)
-    await _check_references(session, user, AgentWorkflow.model_validate(compiled["workflow"]))
+    source_configs = await _check_references(session, user, architecture)
+    compiled = _compile(agent.name, description, architecture, source_configs)
     if payload.guardrail_template_id:
         await get_visible_guardrail(session, user, payload.guardrail_template_id)
 

@@ -29,6 +29,7 @@ from app.routers import (
     knowledge,
     mcp,
     observability,
+    playground,
     runs,
     users,
 )
@@ -101,6 +102,7 @@ def create_app() -> FastAPI:
     app.include_router(observability.ingest_router)
     app.include_router(observability.router)
     app.include_router(deployments.router)
+    app.include_router(playground.router)
     app.include_router(gateway.router)
     return app
 

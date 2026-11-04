@@ -130,6 +130,30 @@
   animation-delay: 0.4s;
 }
 
+.choicePanel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: 40px;
+}
+
+.choicePanel button {
+  border: 1px solid #f7931e;
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: #fff;
+  color: #8a4b00;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.choicePanel button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 @keyframes blink {
   0%, 80%, 100% { opacity: 0.25; }
   40% { opacity: 1; }

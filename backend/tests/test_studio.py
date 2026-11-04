@@ -239,8 +239,8 @@ async def test_create_agent_saves_adk_draft_and_rejects_duplicate_name(client):
     assert agent["guardrail_template_id"] is None
     ast.parse(agent["adk_source"])  # the generated ADK file is valid Python
     assert "LlmAgent(" in agent["adk_source"]
-    assert "SequentialAgent(" in agent["adk_source"]
-    assert "root_agent = group_" in agent["adk_source"]
+    assert "Workflow(" in agent["adk_source"]
+    assert "root_agent = Workflow(" in agent["adk_source"]
     assert "google_search" in agent["adk_source"]
 
     duplicate = await client.post("/api/v1/agents", headers=ALICE, json=_agent_payload())

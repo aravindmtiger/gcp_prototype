@@ -24,8 +24,13 @@ dependencies = [
     "google-auth>=2.30",            # verifies Google ID tokens
     "google-cloud-storage>=2.16",   # GCS object storage
     "google-cloud-tasks>=2.16",     # async run dispatch
-    "google-adk>=1.0",              # Agent Development Kit: agents, evals, api_server
+    "google-adk>=2.13.0",           # Routed Workflow graphs and resumable FunctionNodes
     "google-cloud-aiplatform[agent_engines,adk]>=1.100",  # Vertex AI Agent Runtime deployment
+    "google-cloud-firestore>=2.16",
+    "google-cloud-bigquery>=3.25",
+    "sqlalchemy>=2.0.30",
+    "pg8000>=1.31",
+    "PyMySQL>=1.1",
     # Observability (OpenTelemetry -> Cloud Trace)
     "opentelemetry-api>=1.25",
     "opentelemetry-sdk>=1.25",

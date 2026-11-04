@@ -187,8 +187,55 @@ class SqlExecutorConfig(BaseModel):
     knowledge_source_id: str = Field(min_length=1, max_length=36)
 
 
+class NoSqlExecutorConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    firestore_collection: str = Field(min_length=1, max_length=512, pattern=r"^[A-Za-z0-9_./-]+$")
+
+    @field_validator("firestore_collection")
+    @classmethod
+    def _collection_path(cls, value: str) -> str:
+        parts = value.split("/")
+        if any(not part for part in parts) or len(parts) % 2 == 0:
+            raise ValueError(
+                "Firestore collection paths must contain alternating collection/document IDs"
+            )
+        return value
+
+
 class WebSearchConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class EmailSenderConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    sender_email: str = Field(min_length=3, max_length=320)
+
+
+class FileReaderConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    gcs_bucket: str = Field(min_length=3, max_length=222, pattern=r"^[a-z0-9][a-z0-9._-]+$")
+    prefix: str = Field(default="", max_length=1024)
+
+
+class RouterConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    route_instruction: str = Field(default="", max_length=2000)
+
+
+class IfElseConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    condition: str = Field(min_length=1, max_length=2000)
+
+
+class LoopConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    max_iterations: int = Field(default=3, ge=1, le=20)
+    stop_condition: str = Field(default="", max_length=2000)
+
+
+class HitlConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message: str = Field(default="Choose how to continue.", max_length=2000)
 
 
 class McpServerConfig(BaseModel):
@@ -199,18 +246,18 @@ class McpServerConfig(BaseModel):
 TOOL_CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "knowledge_retriever": KnowledgeRetrieverConfig,
     "sql_executor": SqlExecutorConfig,
-    "nosql_executor": SqlExecutorConfig,
-    "no_sql_executor": SqlExecutorConfig,
+    "nosql_executor": NoSqlExecutorConfig,
+    "no_sql_executor": NoSqlExecutorConfig,
     "web_search": WebSearchConfig,
-    "email_sender": WebSearchConfig,
-    "file_reader": WebSearchConfig,
+    "email_sender": EmailSenderConfig,
+    "file_reader": FileReaderConfig,
     "code_executor": WebSearchConfig,
     "mcp_server": McpServerConfig,
     "base": WebSearchConfig,
-    "router": WebSearchConfig,
-    "loop": WebSearchConfig,
-    "if_else": WebSearchConfig,
-    "hitl": WebSearchConfig,
+    "router": RouterConfig,
+    "loop": LoopConfig,
+    "if_else": IfElseConfig,
+    "hitl": HitlConfig,
 }
 
 
@@ -271,6 +318,7 @@ class ArchitectureEdge(BaseModel):
     id: str = Field(min_length=1, max_length=100)
     source: str = Field(min_length=1, max_length=40)
     target: str = Field(min_length=1, max_length=40)
+    route: str | None = Field(default=None, min_length=1, max_length=100)
 
 
 class AgentArchitecture(BaseModel):

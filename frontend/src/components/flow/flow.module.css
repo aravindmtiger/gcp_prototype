@@ -4,11 +4,19 @@
 .canvas {
   position: relative;
   width: 100%;
-  height: 680px;
-  border-radius: 16px;
+  height: min(74vh, 760px);
+  min-height: 540px;
+  border-radius: 10px;
   overflow: hidden;
-  background: #fbfbfd;
-  box-shadow: inset 0 0 0 1px #ececf2;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #e6e8ed;
+}
+
+.editorDetails {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.75fr);
+  gap: 18px;
+  margin-top: 18px;
 }
 
 .toolbar {
@@ -42,8 +50,146 @@
   color: #b8660a;
 }
 
+.sideToolbar {
+  position: absolute;
+  z-index: 6;
+  top: 50%;
+  right: 14px;
+  display: grid;
+  gap: 5px;
+  width: 56px;
+  padding: 8px 5px;
+  transform: translateY(-50%);
+  border: 1px solid #e1e4ea;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 5px 18px rgba(20, 32, 50, 0.12);
+}
+
+.sideToolButton {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  width: 44px;
+  min-height: 43px;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.sideToolButton > span {
+  font-size: 17px;
+  line-height: 19px;
+}
+
+.sideToolButton small {
+  font-size: 9px;
+  line-height: 12px;
+}
+
+.sideToolButton:hover,
+.sideToolActive {
+  background: #fff3e3;
+  color: #ed850e;
+}
+
+.toolbarDivider {
+  height: 1px;
+  margin: 3px 4px;
+  background: #e2e5eb;
+}
+
+.palettePanel {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  right: 82px;
+  display: flex;
+  flex-direction: column;
+  width: min(270px, calc(100% - 110px));
+  max-height: min(620px, calc(100% - 28px));
+  padding: 14px;
+  transform: translateY(-50%);
+  overflow: hidden;
+  border: 1px solid #e1e4ea;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 8px 26px rgba(20, 32, 50, 0.15);
+}
+
+.paletteHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #20232a;
+  font-size: 14px;
+}
+
+.paletteHeader button {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: #f3f4f6;
+  color: #5b6470;
+  font-size: 20px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.paletteHint {
+  margin: 8px 0 10px;
+  color: #767d88;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.paletteList {
+  display: grid;
+  gap: 6px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.paletteItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  background: #fff;
+  color: #303640;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: grab;
+}
+
+.paletteItem:hover {
+  border-color: #f4bf79;
+  background: #fffaf3;
+}
+
+.paletteItem:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.dragMark {
+  color: #9aa1ad;
+  font-size: 15px;
+}
+
 .card {
-  width: 260px;
+  width: 180px;
   background: #fff;
   border: 1px solid #e3e3ec;
   border-radius: 12px;
@@ -65,20 +211,20 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 12px 12px 0 0;
+  padding: 5px 7px;
+  border-radius: 8px 8px 0 0;
   border-bottom: 1px solid #e8e8ef;
 }
 
 .iconTile {
   flex: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
   display: grid;
   place-items: center;
   color: #fff;
-  font-size: 14px;
+  font-size: 11px;
 }
 
 .titles {
@@ -88,7 +234,7 @@
 }
 
 .title {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -96,7 +242,7 @@
 }
 
 .subtitle {
-  font-size: 10px;
+  font-size: 8px;
   color: #6b6b78;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -124,9 +270,9 @@
 
 .body {
   display: grid;
-  gap: 6px;
-  padding: 8px 12px 10px;
-  font-size: 11px;
+  gap: 4px;
+  padding: 6px 8px 7px;
+  font-size: 9px;
 }
 
 .row {
@@ -138,7 +284,7 @@
 
 .rowLabel {
   flex: none;
-  width: 56px;
+  width: 42px;
   color: #6b6b78;
 }
 
@@ -161,45 +307,65 @@
   border: 2px solid #2f7ad0;
 }
 
+.markerPort {
+  width: 8px;
+  height: 8px;
+  border-width: 1.5px;
+}
+
 .marker {
-  width: 60px;
-  height: 60px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  align-content: center;
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  font-size: 10px;
-  font-weight: 700;
+  background: #fffaf3;
+  border: 1.5px solid #f5b04c;
+  box-shadow: 0 1px 5px rgba(74, 57, 34, 0.14);
   position: relative;
 }
 
 .markerStart {
-  background: #2f9e5b;
+  color: #f7931e;
 }
 
 .markerEnd {
-  background: #f7931e;
-}
-
-.markerRemove {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid #e0e0e8;
-  border-radius: 50%;
   background: #fff;
-  color: #4a4a55;
-  cursor: pointer;
+  border-color: #3b82f6;
+  color: #f7931e;
 }
 
 .markerSelected {
-  box-shadow: 0 0 0 3px rgba(247, 147, 30, 0.35);
+  box-shadow: 0 0 0 2px rgba(247, 147, 30, 0.25);
+}
+
+.markerIcon {
+  display: block;
+  width: 19px;
+  height: 19px;
+  fill: currentColor;
+}
+
+@media (max-width: 760px) {
+  .canvas {
+    height: 68vh;
+    min-height: 480px;
+  }
+
+  .editorDetails {
+    grid-template-columns: 1fr;
+  }
+
+  .sideToolbar {
+    right: 8px;
+    width: 48px;
+  }
+
+  .sideToolButton {
+    width: 38px;
+  }
+
+  .palettePanel {
+    right: 66px;
+  }
 }

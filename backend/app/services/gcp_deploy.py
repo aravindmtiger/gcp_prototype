@@ -26,7 +26,17 @@ CLOUD_BUILD_URL = "https://cloudbuild.googleapis.com/v1"
 CLOUD_RUN_URL = "https://run.googleapis.com/v2"
 POLL_SECONDS = 10
 DEPLOY_TIMEOUT_SECONDS = 1800
-RUNTIME_REQUIREMENTS = ["google-adk>=1.0", "google-cloud-aiplatform[agent_engines,adk]>=1.100"]
+RUNTIME_REQUIREMENTS = [
+    "google-adk>=2.13.0",
+    "google-cloud-aiplatform[agent_engines,adk]>=1.100",
+    "google-cloud-firestore>=2.16",
+    "google-cloud-bigquery>=3.25",
+    "google-cloud-storage>=2.16",
+    "google-auth>=2.30",
+    "sqlalchemy>=2.0.30",
+    "pg8000>=1.31",
+    "PyMySQL>=1.1",
+]
 
 DOCKERFILE = """FROM python:3.12-slim
 WORKDIR /app

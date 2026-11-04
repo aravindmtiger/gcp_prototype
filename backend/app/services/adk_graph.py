@@ -1,24 +1,12 @@
-"""Compiles an agent architecture (canvas nodes and edges) into an ADK agent graph.
+"""Compile Agent Canvas architectures into routed Google ADK workflows."""
 
-Rules, following the Tiger AgentFlow canvas:
-
-* ``start`` and ``end`` nodes mark where the flow begins and ends. They are not agents, and edges
-  that touch them do not add dependencies between agents.
-* Each tool node is one ``LlmAgent`` with its tool and its system prompt.
-* The level of a node is the longest path from an entry node to it. Entry nodes are level 0.
-  Nodes in the same level run together in a ``ParallelAgent``. Levels run in order in a
-  ``SequentialAgent``. A node therefore starts only after every node in an earlier level has
-  finished, which keeps every edge's order.
-* Each agent writes its reply to session state under its own node id. An agent reads the replies
-  of its direct predecessors through ``{id?}`` placeholders in its instruction.
-* Cycles are rejected.
-"""
-
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Any
 
 from app.schemas import AgentArchitecture, AgentWorkflow, ArchitecturePosition
+
+ROUTED_TOOLS = {"router", "if_else", "loop", "hitl"}
 
 
 class ArchitectureError(ValueError):
@@ -35,7 +23,7 @@ class CompiledGraph:
     order: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
-        return {"version": 1, "root": self.root, "order": self.order}
+        return {"version": 2, "root": self.root, "order": self.order}
 
 
 def architecture_from_workflow(workflow: AgentWorkflow) -> AgentArchitecture:
@@ -60,68 +48,149 @@ def architecture_from_workflow(workflow: AgentWorkflow) -> AgentArchitecture:
     return AgentArchitecture(nodes=nodes, edges=edges)
 
 
-def _agent_spec(node, predecessors: list[str]) -> dict[str, Any]:
-    instruction = node.system_prompt.strip()
-    if predecessors:
-        reads = "\n".join(f"{{{pred}?}}" for pred in predecessors)
-        instruction = f"{instruction}\n\nInputs from earlier steps:\n{reads}".strip()
-    return {
-        "type": "llm",
-        "name": node.id,
-        "tool": node.tool,
-        "config": node.config,
-        "instruction": instruction,
-        "output_key": node.id,
-        "reads": predecessors,
-    }
+def _route_labels(node_id: str, edges: list[Any]) -> list[str]:
+    labels = [edge.route for edge in edges if edge.source == node_id]
+    if any(label is None for label in labels):
+        raise ArchitectureError([f"'{node_id}' needs a route label on every outgoing connection"])
+    cleaned = [label.strip() for label in labels if label is not None]
+    if len(cleaned) != len(set(cleaned)):
+        raise ArchitectureError([f"'{node_id}' has duplicate route labels"])
+    return cleaned
+
+
+def _validate_routes(nodes: dict[str, Any], edges: list[Any]) -> None:
+    for node in nodes.values():
+        if node.tool not in ROUTED_TOOLS:
+            if any(edge.route is not None for edge in edges if edge.source == node.id):
+                raise ArchitectureError([f"'{node.id}' does not support labeled connections"])
+            continue
+
+        labels = _route_labels(node.id, edges)
+        if node.tool in {"router", "hitl"} and len(labels) < 2:
+            raise ArchitectureError([f"'{node.id}' needs at least two labeled outgoing paths"])
+        if node.tool == "if_else" and set(labels) != {"true", "false"}:
+            raise ArchitectureError(
+                [f"'{node.id}' needs outgoing paths labeled 'true' and 'false'"]
+            )
+        if node.tool == "loop" and set(labels) != {"continue", "exit"}:
+            raise ArchitectureError(
+                [f"'{node.id}' needs outgoing paths labeled 'continue' and 'exit'"]
+            )
+
+
+def _topological_order(nodes: dict[str, Any], edges: list[Any]) -> list[str]:
+    """Allow cycles only when a Loop's ``continue`` route breaks them."""
+    validation_successors: dict[str, list[str]] = defaultdict(list)
+    validation_indegree = {node_id: 0 for node_id in nodes}
+    for edge in edges:
+        if edge.source not in nodes or edge.target not in nodes:
+            continue
+        if nodes[edge.source].tool == "loop" and edge.route and edge.route.lower() == "continue":
+            continue
+        validation_successors[edge.source].append(edge.target)
+        validation_indegree[edge.target] += 1
+
+    validation_queue = deque(node_id for node_id in nodes if validation_indegree[node_id] == 0)
+    visited: set[str] = set()
+    while validation_queue:
+        current = validation_queue.popleft()
+        visited.add(current)
+        for target in validation_successors[current]:
+            validation_indegree[target] -= 1
+            if validation_indegree[target] == 0:
+                validation_queue.append(target)
+    if len(visited) != len(nodes):
+        stuck = sorted(node_id for node_id in nodes if node_id not in visited)
+        raise ArchitectureError(
+            [f"The flow contains a cycle not controlled by a Loop node: {', '.join(stuck)}"]
+        )
+
+    successors: dict[str, list[str]] = defaultdict(list)
+    indegree = {node_id: 0 for node_id in nodes}
+    for edge in edges:
+        if edge.source not in nodes or edge.target not in nodes:
+            continue
+        if nodes[edge.target].tool == "loop":
+            continue
+        successors[edge.source].append(edge.target)
+        indegree[edge.target] += 1
+    queue = deque(node_id for node_id in nodes if indegree[node_id] == 0)
+    result: list[str] = []
+    while queue:
+        current = queue.popleft()
+        result.append(current)
+        for target in successors[current]:
+            indegree[target] -= 1
+            if indegree[target] == 0:
+                queue.append(target)
+    return result
 
 
 def compile_architecture(architecture: AgentArchitecture, agent_name: str) -> CompiledGraph:
     tools = {node.id: node for node in architecture.nodes if node.kind == "tool"}
-    preds: dict[str, list[str]] = defaultdict(list)
-    succs: dict[str, list[str]] = defaultdict(list)
-    for edge in architecture.edges:
+    edges = architecture.edges
+    _validate_routes(tools, edges)
+    order = _topological_order(tools, edges)
+    start_ids = {node.id for node in architecture.nodes if node.kind == "start"}
+    entry_nodes = [
+        edge.target for edge in edges if edge.source in start_ids and edge.target in tools
+    ]
+    if not entry_nodes:
+        entry_nodes = [
+            node_id
+            for node_id in order
+            if not any(edge.target == node_id and edge.source in tools for edge in edges)
+        ]
+
+    predecessors: dict[str, list[str]] = defaultdict(list)
+    for edge in edges:
         if edge.source in tools and edge.target in tools:
-            preds[edge.target].append(edge.source)
-            succs[edge.source].append(edge.target)
+            predecessors[edge.target].append(edge.source)
 
-    # Kahn's algorithm: nodes that never reach indegree 0 sit on a cycle.
-    indegree = {tid: len(preds[tid]) for tid in tools}
-    queue = [tid for tid in tools if indegree[tid] == 0]
-    topo: list[str] = []
-    while queue:
-        current = queue.pop(0)
-        topo.append(current)
-        for nxt in succs[current]:
-            indegree[nxt] -= 1
-            if indegree[nxt] == 0:
-                queue.append(nxt)
-    if len(topo) != len(tools):
-        stuck = sorted(tid for tid in tools if tid not in topo)
-        raise ArchitectureError([f"The flow loops back on itself through: {', '.join(stuck)}"])
+    specs: list[dict[str, Any]] = []
+    compiled_edges: list[dict[str, Any]] = []
+    for node_id in order:
+        node = tools[node_id]
+        options = _route_labels(node_id, edges) if node.tool in ROUTED_TOOLS else []
+        instruction = node.system_prompt.strip()
+        if predecessors[node_id]:
+            reads = "\n".join(f"{{{pred}?}}" for pred in predecessors[node_id])
+            instruction = f"{instruction}\n\nInputs from connected steps:\n{reads}".strip()
 
-    level: dict[str, int] = {}
-    for tid in topo:
-        level[tid] = 1 + max((level[p] for p in preds[tid]), default=-1)
+        spec: dict[str, Any] = {
+            "type": "hitl" if node.tool == "hitl" else "agent",
+            "name": node_id,
+            "tool": node.tool,
+            "config": node.config,
+            "instruction": instruction,
+            "output_key": node_id,
+            "reads": predecessors[node_id],
+            "routes": options,
+        }
+        if node.tool in {"router", "if_else", "loop"}:
+            spec["selector"] = f"{node_id}_route"
+            compiled_edges.append({"source": node_id, "target": spec["selector"], "route": None})
+        specs.append(spec)
 
-    by_level: dict[int, list[str]] = defaultdict(list)
-    for node in architecture.nodes:  # keep the canvas order inside a level
-        if node.kind == "tool" and node.id in level:
-            by_level[level[node.id]].append(node.id)
+    for edge in edges:
+        if edge.source not in tools:
+            continue
+        source = (
+            f"{edge.source}_route"
+            if tools[edge.source].tool in {"router", "if_else", "loop"}
+            else edge.source
+        )
+        target = edge.target if edge.target in tools else "canvas_end"
+        compiled_edges.append({"source": source, "target": target, "route": edge.route})
 
-    steps: list[dict[str, Any]] = []
-    for lvl in sorted(by_level):
-        members = [_agent_spec(tools[tid], preds[tid]) for tid in by_level[lvl]]
-        if len(members) == 1:
-            steps.append(members[0])
-        else:
-            steps.append(
-                {"type": "parallel", "name": f"{agent_name}_level_{lvl}", "sub_agents": members}
-            )
+    if any(edge["target"] == "canvas_end" for edge in compiled_edges):
+        specs.append({"type": "terminal", "name": "canvas_end"})
 
-    if len(steps) == 1:
-        root = steps[0]
-        root["name"] = agent_name
-    else:
-        root = {"type": "sequential", "name": agent_name, "sub_agents": steps}
-    return CompiledGraph(root=root, order=topo)
+    root = {
+        "type": "workflow",
+        "name": agent_name,
+        "nodes": specs,
+        "edges": compiled_edges,
+        "entry_nodes": entry_nodes,
+    }
+    return CompiledGraph(root=root, order=order)

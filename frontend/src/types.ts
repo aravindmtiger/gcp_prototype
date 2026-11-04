@@ -66,6 +66,7 @@ export interface ArchitectureEdge {
   id: string;
   source: string;
   target: string;
+  route?: string | null;
 }
 
 /** The canvas graph as the backend stores it. */

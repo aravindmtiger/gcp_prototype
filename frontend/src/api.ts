@@ -109,6 +109,22 @@ export const api = {
     }),
   listDeployments: (agentId: string) => apiFetch<Deployment[]>(`/api/v1/agents/${agentId}/deployments`),
   getDeployment: (deploymentId: string) => apiFetch<Deployment>(`/api/v1/deployments/${deploymentId}`),
+  createPlaygroundSession: (agentId: string) =>
+    apiFetch<{ session_id: string }>(`/api/v1/agents/${agentId}/playground/sessions`, { method: 'POST' }),
+  runPlayground: (
+    agentId: string,
+    input: {
+      session_id: string;
+      message?: string;
+      choice?: string;
+      interrupt_id?: string;
+      function_call_event_id?: string;
+    },
+  ) =>
+    apiFetch<{ events: Record<string, unknown>[] }>(`/api/v1/agents/${agentId}/playground/run`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
   listKnowledge: () => apiFetch<KnowledgeSource[]>('/api/v1/knowledge-sources'),
   createKnowledge: (input: { name: string; description: string; kind: 'structured' | 'unstructured'; config: Record<string, string> }) =>
     apiFetch<KnowledgeSource>('/api/v1/knowledge-sources', { method: 'POST', body: JSON.stringify(input) }),

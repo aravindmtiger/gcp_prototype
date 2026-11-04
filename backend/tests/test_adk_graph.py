@@ -1,4 +1,4 @@
-"""Canvas architecture to ADK graph: the compile rules, the generated source, and the save path."""
+"""Canvas architecture compilation, generated ADK source, and save validation."""
 
 import ast
 
@@ -18,7 +18,7 @@ ALICE = {"X-Dev-User": "alice@example.com"}
 def _graph(
     nodes: list[str], edges: list[tuple[str, str]], markers: bool = False
 ) -> AgentArchitecture:
-    items = [{"id": n, "kind": "tool", "tool": "web_search"} for n in nodes]
+    items = [{"id": name, "kind": "tool", "tool": "web_search"} for name in nodes]
     if markers:
         items = [{"id": "start", "kind": "start"}, *items, {"id": "end", "kind": "end"}]
     return AgentArchitecture.model_validate(
@@ -29,60 +29,205 @@ def _graph(
     )
 
 
-def test_a_chain_runs_one_agent_after_another():
+def test_a_chain_compiles_to_connected_workflow_nodes():
     compiled = compile_architecture(_graph(["a", "b", "c"], [("a", "b"), ("b", "c")]), "flow")
-    assert compiled.root["type"] == "sequential"
-    assert [step["name"] for step in compiled.root["sub_agents"]] == ["a", "b", "c"]
+    assert compiled.root["type"] == "workflow"
     assert compiled.order == ["a", "b", "c"]
-    assert compiled.root["sub_agents"][1]["reads"] == ["a"]
+    assert [node["name"] for node in compiled.root["nodes"]] == ["a", "b", "c"]
+    assert compiled.root["entry_nodes"] == ["a"]
+    assert compiled.root["edges"] == [
+        {"source": "a", "target": "b", "route": None},
+        {"source": "b", "target": "c", "route": None},
+    ]
+    assert compiled.root["nodes"][1]["reads"] == ["a"]
 
 
-def test_a_fan_out_runs_in_parallel_then_joins():
-    architecture = _graph(["a", "b", "c", "d"], [("a", "b"), ("a", "c"), ("b", "d"), ("c", "d")])
+def test_a_fan_out_keeps_every_edge_for_adk_concurrency():
+    architecture = _graph(
+        ["a", "b", "c", "d"],
+        [("a", "b"), ("a", "c"), ("b", "d"), ("c", "d")],
+    )
     compiled = compile_architecture(architecture, "flow")
-    steps = compiled.root["sub_agents"]
-    assert steps[0]["name"] == "a"
-    assert {member["name"] for member in steps[1]["sub_agents"]} == {"b", "c"}
-    assert steps[1]["type"] == "parallel"
-    assert steps[2]["name"] == "d"
-    assert set(steps[2]["reads"]) == {"b", "c"}
+    assert compiled.order == ["a", "b", "c", "d"]
+    assert len(compiled.root["edges"]) == 4
+    assert compiled.root["nodes"][-1]["reads"] == ["b", "c"]
 
 
-def test_a_loop_is_rejected_with_the_nodes_in_it():
-    with pytest.raises(ArchitectureError) as info:
+def test_unbounded_cycles_are_rejected():
+    with pytest.raises(ArchitectureError, match="not controlled by a Loop"):
         compile_architecture(_graph(["a", "b"], [("a", "b"), ("b", "a")]), "flow")
-    assert "loops back" in info.value.messages[0]
-    assert "a, b" in info.value.messages[0]
 
 
-def test_start_and_end_markers_do_not_add_agents_or_dependencies():
-    markers = AgentArchitecture.model_validate(
+def test_a_loop_node_can_control_a_bounded_cycle():
+    architecture = AgentArchitecture.model_validate(
         {
             "nodes": [
                 {"id": "start", "kind": "start"},
-                {"id": "a", "kind": "tool", "tool": "web_search"},
+                {"id": "repeat", "kind": "tool", "tool": "loop", "config": {"max_iterations": 4}},
+                {"id": "body", "kind": "tool", "tool": "base"},
                 {"id": "end", "kind": "end"},
             ],
             "edges": [
-                {"id": "s", "source": "start", "target": "a"},
-                {"id": "e", "source": "a", "target": "end"},
+                {"id": "start", "source": "start", "target": "repeat"},
+                {"id": "continue", "source": "repeat", "target": "body", "route": "continue"},
+                {"id": "again", "source": "body", "target": "repeat"},
+                {"id": "exit", "source": "repeat", "target": "end", "route": "exit"},
             ],
         }
     )
-    compiled = compile_architecture(markers, "flow")
-    assert compiled.order == ["a"]
-    assert compiled.root["type"] == "llm"
-    assert compiled.root["name"] == "flow"
-
-
-def test_generated_source_is_valid_python_with_the_graph_structure():
-    architecture = _graph(["a", "b", "c", "d"], [("a", "b"), ("a", "c"), ("b", "d"), ("c", "d")])
     compiled = compile_architecture(architecture, "flow")
-    source = render_adk_agent("flow", "Answers", compiled.as_dict())
+    assert compiled.order == ["repeat", "body"]
+    assert {"source": "repeat_route", "target": "body", "route": "continue"} in compiled.root[
+        "edges"
+    ]
+    source = render_adk_agent("flow", "Repeat safely", compiled.as_dict())
+    namespace = {}
+    exec(compile(source, "agent.py", "exec"), namespace)
+    assert namespace["root_agent"].name == "flow"
+
+
+def test_control_nodes_require_explicit_labeled_paths():
+    architecture = AgentArchitecture.model_validate(
+        {
+            "nodes": [
+                {"id": "start", "kind": "start"},
+                {"id": "route", "kind": "tool", "tool": "router"},
+                {"id": "one", "kind": "tool", "tool": "base"},
+                {"id": "two", "kind": "tool", "tool": "base"},
+                {"id": "end", "kind": "end"},
+            ],
+            "edges": [
+                {"id": "s", "source": "start", "target": "route"},
+                {"id": "one", "source": "route", "target": "one", "route": "approve"},
+                {"id": "two", "source": "route", "target": "two", "route": "reject"},
+            ],
+        }
+    )
+    compiled = compile_architecture(architecture, "flow")
+    assert {"source": "route_route", "target": "one", "route": "approve"} in compiled.root["edges"]
+    assert compiled.root["nodes"][0]["routes"] == ["approve", "reject"]
+    source = render_adk_agent("flow", "Choose a route", compiled.as_dict())
+    namespace = {}
+    exec(compile(source, "agent.py", "exec"), namespace)
+    assert namespace["root_agent"].name == "flow"
+
+    invalid = architecture.model_copy(
+        update={
+            "edges": [
+                architecture.edges[0],
+                architecture.edges[1].model_copy(update={"route": None}),
+                architecture.edges[2],
+            ]
+        }
+    )
+    with pytest.raises(ArchitectureError, match="route label"):
+        compile_architecture(invalid, "flow")
+
+
+def test_hitl_compiles_to_resumable_choice_node():
+    architecture = AgentArchitecture.model_validate(
+        {
+            "nodes": [
+                {"id": "start", "kind": "start"},
+                {
+                    "id": "approval",
+                    "kind": "tool",
+                    "tool": "hitl",
+                    "config": {"message": "Approve?"},
+                },
+                {"id": "yes", "kind": "tool", "tool": "base"},
+                {"id": "no", "kind": "tool", "tool": "base"},
+                {"id": "end", "kind": "end"},
+            ],
+            "edges": [
+                {"id": "s", "source": "start", "target": "approval"},
+                {"id": "y", "source": "approval", "target": "yes", "route": "approve"},
+                {"id": "n", "source": "approval", "target": "no", "route": "reject"},
+            ],
+        }
+    )
+    graph = compile_architecture(architecture, "flow").as_dict()
+    source = render_adk_agent("flow", "Review", graph)
     ast.parse(source)
-    assert "ParallelAgent(" in source
-    assert "root_agent = group_" in source
-    assert "{b?}" in source and "{c?}" in source
+    namespace = {}
+    exec(compile(source, "agent.py", "exec"), namespace)
+    assert "RequestInput(" in source
+    assert "rerun_on_resume=True" in source
+    assert namespace["root_agent"].name == "flow"
+
+
+def test_generated_source_instantiates_a_real_adk_workflow():
+    graph = compile_architecture(_graph(["a", "b"], [("a", "b")], markers=True), "flow").as_dict()
+    source = render_adk_agent("flow", "Answers", graph)
+    ast.parse(source)
+    namespace = {}
+    exec(compile(source, "agent.py", "exec"), namespace)
+    assert namespace["root_agent"].name == "flow"
+    assert "Workflow(" in source
+    assert "google_search" in source
+
+
+def test_requested_tools_are_wired_to_adk_or_google_cloud_clients():
+    architecture = AgentArchitecture.model_validate(
+        {
+            "nodes": [
+                {
+                    "id": "kb",
+                    "kind": "tool",
+                    "tool": "knowledge_retriever",
+                    "config": {"knowledge_source_id": "rag"},
+                },
+                {
+                    "id": "sql",
+                    "kind": "tool",
+                    "tool": "sql_executor",
+                    "config": {"knowledge_source_id": "table"},
+                },
+                {
+                    "id": "nosql",
+                    "kind": "tool",
+                    "tool": "nosql_executor",
+                    "config": {"firestore_collection": "customers"},
+                },
+                {"id": "web", "kind": "tool", "tool": "web_search"},
+                {
+                    "id": "mail",
+                    "kind": "tool",
+                    "tool": "email_sender",
+                    "config": {"sender_email": "agent@example.com"},
+                },
+                {
+                    "id": "file",
+                    "kind": "tool",
+                    "tool": "file_reader",
+                    "config": {"gcs_bucket": "agent-files"},
+                },
+                {"id": "code", "kind": "tool", "tool": "code_executor"},
+            ],
+            "edges": [],
+        }
+    )
+    graph = compile_architecture(architecture, "tools").as_dict()
+    source = render_adk_agent(
+        "tools",
+        "Uses tools",
+        graph,
+        {
+            "kb": {"rag_corpus": "projects/demo/locations/us-central1/ragCorpora/policies"},
+            "sql": {"backend": "bigquery", "table_ref": "demo.data.orders"},
+        },
+    )
+    ast.parse(source)
+    namespace = {}
+    exec(compile(source, "agent.py", "exec"), namespace)
+    assert "VertexAiRagRetrieval(" in source
+    assert "google.cloud import bigquery" in source
+    assert "google.cloud import firestore" in source
+    assert "gmail.googleapis.com/gmail/v1/users/me/messages/send" in source
+    assert "google.cloud import storage" in source
+    assert "BuiltInCodeExecutor()" in source
+    assert "CODE_EXECUTOR_MODEL_ID" in source
+    assert namespace["root_agent"].name == "tools"
 
 
 def test_architecture_rules_are_checked_when_parsed():
@@ -106,7 +251,7 @@ async def client(database):
     app.dependency_overrides.clear()
 
 
-async def test_saving_a_draft_stores_the_architecture_and_the_adk_graph(client):
+async def test_saving_a_draft_stores_the_architecture_and_routed_adk_graph(client):
     payload = {
         "name": "flow_agent",
         "description": "Answers",
@@ -135,12 +280,16 @@ async def test_saving_a_draft_stores_the_architecture_and_the_adk_graph(client):
     created = await client.post("/api/v1/agents", headers=ALICE, json=payload)
     assert created.status_code == 201, created.text
     agent = created.json()
-    assert agent["architecture"]["edges"][1]["target"] == "answer"
-    assert agent["adk_graph"]["root"]["type"] == "sequential"
-    assert "SequentialAgent(" in agent["adk_source"]
+    assert {node["kind"] for node in agent["architecture"]["nodes"]} >= {"start", "end"}
+    assert any(
+        edge["source"] == "answer" and edge["target"] == "end"
+        for edge in agent["architecture"]["edges"]
+    )
+    assert agent["adk_graph"]["root"]["type"] == "workflow"
+    assert "Workflow(" in agent["adk_source"]
 
 
-async def test_a_looping_canvas_is_refused_with_a_clear_message(client):
+async def test_a_looping_canvas_without_a_loop_node_is_refused(client):
     payload = {
         "name": "loop_agent",
         "description": "Loops",
@@ -157,4 +306,4 @@ async def test_a_looping_canvas_is_refused_with_a_clear_message(client):
     }
     refused = await client.post("/api/v1/agents", headers=ALICE, json=payload)
     assert refused.status_code == 422
-    assert "loops back" in refused.json()["detail"]
+    assert "cycle not controlled by a Loop" in refused.json()["detail"]
