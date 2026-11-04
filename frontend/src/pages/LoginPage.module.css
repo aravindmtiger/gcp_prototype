@@ -1,0 +1,180 @@
+/* GCP Agent OS sign-in: a product showcase on the left, the sign-in card on the right. */
+
+.page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 460px);
+  align-items: center;
+  gap: 48px;
+  padding: 48px 6vw;
+  background: linear-gradient(120deg, #eef4fb 0%, #f6f6f9 45%, #fdf0e1 100%);
+  color: #1d1d24;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  box-sizing: border-box;
+}
+
+.showcase {
+  position: relative;
+  min-height: 480px;
+}
+
+.brand {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #f7931e;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.tile {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(20, 20, 40, 0.08);
+  display: grid;
+  gap: 10px;
+  width: 230px;
+}
+
+.tile strong {
+  font-size: 14px;
+}
+
+.bar {
+  height: 10px;
+  border-radius: 6px;
+  background: #ece7ff;
+}
+
+.bars {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.t1 { top: 70px; left: 0; }
+.t2 { top: 60px; left: 260px; }
+.t3 { top: 260px; left: 40px; }
+.t4 { top: 300px; left: 290px; }
+
+.dot {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #f7931e;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 15px;
+  box-shadow: 0 6px 14px rgba(247, 147, 30, 0.35);
+}
+
+.panel {
+  background: #fff;
+  border-radius: 20px;
+  padding: 44px 40px;
+  box-shadow: 0 16px 40px rgba(20, 20, 40, 0.1);
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+}
+
+.icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: #f7931e;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.description {
+  margin: 0;
+  color: #4a4a55;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.google {
+  width: 100%;
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+}
+
+.note {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b6b78;
+  line-height: 1.5;
+}
+
+.error {
+  color: #b03224;
+  background: #fde5e2;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 18px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  font-size: 14px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #1d7a41;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .page {
+    grid-template-columns: 1fr;
+    padding: 28px 20px;
+  }
+  .showcase {
+    display: none;
+  }
+}

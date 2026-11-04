@@ -1,0 +1,26 @@
+# Builds both container images and pushes them to Artifact Registry.
+# Submitted by deploy/scripts/deploy.sh:
+#   gcloud builds submit . --config deploy/cloudbuild.yaml --substitutions=_REGISTRY=...,_TAG=...
+substitutions:
+  _REGISTRY: ""   # e.g. us-central1-docker.pkg.dev/my-project/agentflow
+  _TAG: "latest"
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-api
+    waitFor: ["-"]
+    args: ["build", "-t", "${_REGISTRY}/api:${_TAG}", "./backend"]
+
+  - name: gcr.io/cloud-builders/docker
+    id: build-ui
+    waitFor: ["-"]
+    args: ["build", "-t", "${_REGISTRY}/ui:${_TAG}", "./frontend"]
+
+images:
+  - "${_REGISTRY}/api:${_TAG}"
+  - "${_REGISTRY}/ui:${_TAG}"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1500s

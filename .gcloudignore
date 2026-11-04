@@ -1,0 +1,11 @@
+# Never upload local secrets or build junk as Cloud Build context.
+.env
+.env.*
+!.env.example
+data/
+**/.venv/
+**/node_modules/
+**/dist/
+**/__pycache__/
+**/.pytest_cache/
+.git/

@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gcp-agentflow-api"
+version = "1.0.0"
+description = "GCP-native agentflow backend: flows, runs, RAG, on Cloud Run"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.29",
+    "pgvector>=0.3",
+    "python-multipart>=0.0.9",
+    "redis>=5.0",
+    "httpx>=0.27",
+    # Google Cloud / Agent Platform
+    "google-genai>=1.0",            # Gemini via Gemini API (api_key) or Vertex AI (vertex)
+    "anthropic[vertex]>=0.40",      # Claude on Vertex AI (AnthropicVertex)
+    "google-auth>=2.30",            # verifies Google ID tokens
+    "google-cloud-storage>=2.16",   # GCS object storage
+    "google-cloud-tasks>=2.16",     # async run dispatch
+    "google-adk>=1.0",              # Agent Development Kit: agents, evals, api_server
+    "google-cloud-aiplatform[agent_engines,adk]>=1.100",  # Vertex AI Agent Runtime deployment
+    # Observability (OpenTelemetry -> Cloud Trace)
+    "opentelemetry-api>=1.25",
+    "opentelemetry-sdk>=1.25",
+    "opentelemetry-instrumentation-fastapi>=0.46b0",
+    "opentelemetry-exporter-gcp-trace>=1.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "aiosqlite>=0.20",   # unit/API tests use SQLite; production uses PostgreSQL
+    "ruff>=0.5",
+    "black>=24.4",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["B008"]  # FastAPI idiom: Depends(...) and File(...) in parameter defaults

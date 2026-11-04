@@ -1,0 +1,59 @@
+:root {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #1d2630;
+  background: #f5f7fa;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin: 0.4rem 0 1rem;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  padding: 6px 8px;
+  border: 1px solid #b9c3d1;
+  border-radius: 6px;
+  background: #fff;
+}
+
+button {
+  padding: 6px 12px;
+  border: 1px solid #0b3d5c;
+  border-radius: 6px;
+  background: #0b3d5c;
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+td,
+th {
+  padding: 8px 6px;
+  border-bottom: 1px solid #e3e8ef;
+  vertical-align: top;
+}

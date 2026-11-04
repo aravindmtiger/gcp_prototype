@@ -1,0 +1,4 @@
+-- Applied once by bootstrap_gcp.sh via `gcloud sql import sql`, which runs with the
+-- privileges Cloud SQL needs to create extensions. Idempotent, so re-running is safe.
+CREATE EXTENSION IF NOT EXISTS vector;
+GRANT ALL ON SCHEMA public TO __DB_USER__;

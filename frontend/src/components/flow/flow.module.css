@@ -1,0 +1,205 @@
+/* Agent canvas: tool cards, Start and Stop markers, dashed connectors. Modelled on the Tiger
+   AgentFlow canvas: white cards with a tinted header, labelled ports and blue dashed edges. */
+
+.canvas {
+  position: relative;
+  width: 100%;
+  height: 680px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fbfbfd;
+  box-shadow: inset 0 0 0 1px #ececf2;
+}
+
+.toolbar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.toolbarButton {
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: #2d2d35;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+}
+
+.toolbarButton:hover {
+  background: #fff6ec;
+  color: #b8660a;
+}
+
+.card {
+  width: 260px;
+  background: #fff;
+  border: 1px solid #e3e3ec;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #1d1d24;
+}
+
+.cardSelected {
+  border-color: #f7931e;
+  box-shadow: 0 0 0 3px rgba(247, 147, 30, 0.25);
+}
+
+.cardWarn {
+  border-color: #f1c2bd;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px 12px 0 0;
+  border-bottom: 1px solid #e8e8ef;
+}
+
+.iconTile {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 14px;
+}
+
+.titles {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subtitle {
+  font-size: 10px;
+  color: #6b6b78;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.removeButton {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #e0e0e8;
+  border-radius: 50%;
+  background: #fff;
+  color: #4a4a55;
+  cursor: pointer;
+}
+
+.removeButton:hover {
+  background: #fde5e2;
+  border-color: #f1c2bd;
+  color: #b03224;
+}
+
+.body {
+  display: grid;
+  gap: 6px;
+  padding: 8px 12px 10px;
+  font-size: 11px;
+}
+
+.row {
+  display: flex;
+  gap: 6px;
+  color: #3d3d46;
+  min-width: 0;
+}
+
+.rowLabel {
+  flex: none;
+  width: 56px;
+  color: #6b6b78;
+}
+
+.rowValue {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.warn {
+  color: #b8660a;
+}
+
+.port {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #2f7ad0;
+}
+
+.marker {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  position: relative;
+}
+
+.markerStart {
+  background: #2f9e5b;
+}
+
+.markerEnd {
+  background: #f7931e;
+}
+
+.markerRemove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #e0e0e8;
+  border-radius: 50%;
+  background: #fff;
+  color: #4a4a55;
+  cursor: pointer;
+}
+
+.markerSelected {
+  box-shadow: 0 0 0 3px rgba(247, 147, 30, 0.35);
+}

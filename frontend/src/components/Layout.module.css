@@ -1,0 +1,85 @@
+.shell {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  min-height: 100vh;
+  background: linear-gradient(160deg, #fdf1e4 0%, #f6f7fa 42%, #e2edf7 100%);
+  color: #1d1d24;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.rail {
+  background: #fff;
+  border-right: 1px solid #ececf2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 0;
+  gap: 6px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.logo {
+  font-weight: 800;
+  color: #f7931e;
+  margin-bottom: 14px;
+  font-size: 15px;
+}
+
+.navItem {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #4b4b56;
+  text-decoration: none;
+  font-size: 18px;
+}
+
+.navItem:hover {
+  background: #fff4e6;
+}
+
+.navActive {
+  background: #f7931e;
+  color: #fff;
+}
+
+.railFooter {
+  margin-top: auto;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  font-size: 11px;
+  color: #6b6b78;
+}
+
+.railFooter button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #6b6b78;
+  font-size: 11px;
+}
+
+.main {
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px 0;
+  font-size: 13px;
+  color: #5d5d68;
+}
+
+.role {
+  text-transform: capitalize;
+  font-size: 10px;
+  color: #9a9aa6;
+}

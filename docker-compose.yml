@@ -1,0 +1,64 @@
+# Local infrastructure that stands in for Cloud SQL and Memorystore.
+#
+#   docker compose up -d postgres redis          # infrastructure only (default for development)
+#   docker compose --profile app up --build -d   # also run the API and UI as containers
+#
+# Values in .env are read by the api/ui services. The environment: blocks below override the
+# host-only addresses (localhost) with container-network addresses.
+name: gcp-agentflow
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: agentflow
+      POSTGRES_PASSWORD: agentflow
+      POSTGRES_DB: agentflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentflow -d agentflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    profiles: ["app"]
+    build: ./backend
+    env_file: .env
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgresql+asyncpg://agentflow:agentflow@postgres:5432/agentflow
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: http://localhost:8081
+      BACKEND_PUBLIC_URL: http://localhost:8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  ui:
+    profiles: ["app"]
+    build: ./frontend
+    environment:
+      UI_API_BASE_URL: http://localhost:8080
+      UI_AUTH_MODE: ${UI_AUTH_MODE:-dev}
+      UI_GOOGLE_CLIENT_ID: ${UI_GOOGLE_CLIENT_ID:-}
+      UI_DEV_USER: ${UI_DEV_USER:-dev@example.com}
+    ports:
+      - "8081:8080"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
